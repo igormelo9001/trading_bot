@@ -1,112 +1,67 @@
 import ccxt
-import config
 import time
-import pandas as pd
+from config import api_key, api_secret  # Importa as credenciais do arquivo config.py
 
-# Configurar a corretora (usando a Binance Testnet)
+# Configurações da API da Binance
+symbol = 'BTC/USDT'
+
+# Configuração da exchange (Binance Testnet)
 exchange = ccxt.binance({
-    'apiKey': config.API_KEY,
-    'secret': config.API_SECRET,
-    'enableRateLimit': True,
-    'urls': {
-        'api': {
-            'public': 'https://testnet.binance.vision/api/v3',
-            'private': 'https://testnet.binance.vision/api/v3',
-        },
-    },
+    'apiKey': api_key,
+    'secret': api_secret,
+    'enableRateLimit': True,  # Habilita limitação de taxa (rate limit)
+    'options': {
+        'defaultType': 'future',  # Configura para operar no modo future
+    }
 })
 
-# Verificar se as chaves de API são carregadas corretamente
-print(f"API Key: {exchange.apiKey}")
-print(f"API Secret: {exchange.secret}")
-
-# Definir a estratégia de trading (exemplo simples de média móvel)
-def trading_strategy(ticker_data):
-    closes = [ticker_data['close']]
-    if len(closes) < 20:
-        return None
-
-    short_ma = sum(closes[-5:]) / 5
-    long_ma = sum(closes[-20:]) / 20
-
-    if short_ma > long_ma:
-        return 'long'
-    elif short_ma < long_ma:
-        return 'short'
-    return None
-
-def print_trade_details(order, balance):
-    print(f"\nOrdem Executada:")
-    print(f"ID: {order['id']}")
-    print(f"Tipo: {order['side']}")
-    print(f"Preço: {order['price']}")
-    print(f"Quantidade: {order['amount']}")
-    print(f"Margem: {order['cost']}")
-    print(f"Saldo: {balance}")
-
-def display_ticker_info(ticker):
-    ticker_data = {
-        'Symbol': ticker['symbol'],
-        'Timestamp': ticker['timestamp'],
-        'Datetime': ticker['datetime'],
-        'High': ticker['high'],
-        'Low': ticker['low'],
-        'Bid': ticker['bid'],
-        'Bid Volume': ticker['bidVolume'],
-        'Ask': ticker['ask'],
-        'Ask Volume': ticker['askVolume'],
-        'VWAP': ticker['vwap'],
-        'Open': ticker['open'],
-        'Close': ticker['close'],
-        'Last': ticker['last'],
-        'Previous Close': ticker['previousClose'],
-        'Change': ticker['change'],
-        'Percentage': ticker['percentage'],
-        'Average': ticker['average'],
-        'Base Volume': ticker['baseVolume'],
-        'Quote Volume': ticker['quoteVolume']
-    }
-    df = pd.DataFrame([ticker_data])
-    print("\nTicker Data:")
-    print(df)
-
-# Monitorar o mercado e executar ordens
 def run_bot():
-    previous_position = None
+    # Entrar no mercado comprando no preço de mercado
+    print("Entrando no mercado...")
+    order = exchange.create_market_buy_order(symbol, amount=0.001)
+    print("Ordem de compra executada:", order)
+
+    # Loop principal para monitorar e decidir operações
     while True:
         try:
-            ticker = exchange.fetch_ticker('BTC/USDT')  # Ajuste para o par de moedas desejado
-            display_ticker_info(ticker)
-            
-            position = trading_strategy(ticker)
-            print(f"Nova posição: {position}")
+            # Obter dados do ticker
+            ticker = exchange.fetch_ticker(symbol)
+            print("\nTicker Data:")
+            print(ticker)
 
-            if position != previous_position:
-                if position == 'long':
-                    order = exchange.create_market_buy_order('BTC/USDT', 0.001)  # Ajuste a quantidade
-                    print("Ordem de COMPRA executada")
-                elif position == 'short':
-                    order = exchange.create_market_sell_order('BTC/USDT', 0.001)  # Ajuste a quantidade
-                    print("Ordem de VENDA executada")
-                
-                balance = exchange.fetch_balance()
-                print_trade_details(order, balance)
-                previous_position = position
-            else:
-                print("Nenhuma alteração na posição")
+            # Simulação de lógica para decidir entre long ou short
+            if should_enter_long(ticker):
+                print("\nIdentificado um bom momento para Long.")
+                # Criar operação de Long
+                order = exchange.create_market_buy_order(symbol, amount=0.001)
+                print("Ordem de compra (Long) executada:", order)
+            elif should_enter_short(ticker):
+                print("\nIdentificado um bom momento para Short.")
+                # Criar operação de Short
+                order = exchange.create_market_sell_order(symbol, amount=0.001)
+                print("Ordem de venda (Short) executada:", order)
 
-            # Evitar loop infinito rápido
-            time.sleep(60)  # Esperar um minuto antes de verificar novamente
+            # Exibir saldo em tempo real
+            balance = exchange.fetch_balance()
+            print("\nSaldo em tempo real:")
+            print(balance['total'])
 
-        except ccxt.NetworkError as e:
-            print(f"Erro de rede: {str(e)}. Tentando novamente...")
-            time.sleep(60)
-        except ccxt.ExchangeError as e:
-            print(f"Erro na exchange: {str(e)}. Tentando novamente...")
-            time.sleep(60)
+            # Esperar antes de verificar novamente (por exemplo, a cada 5 segundos)
+            time.sleep(5)
+
         except Exception as e:
-            print(f"Erro inesperado: {str(e)}. Tentando novamente...")
-            time.sleep(60)
+            print(f"Erro encontrado: {e}")
+            time.sleep(10)  # Esperar antes de tentar novamente
 
-if __name__ == "__main__":
-    run_bot()
+def should_enter_long(ticker):
+    # Lógica para determinar se deve entrar em Long
+    # Exemplo simplificado: baseado em uma condição fictícia
+    return ticker['change'] > 0.5  # Exemplo fictício de condição
+
+def should_enter_short(ticker):
+    # Lógica para determinar se deve entrar em Short
+    # Exemplo simplificado: baseado em uma condição fictícia
+    return ticker['change'] < -0.5  # Exemplo fictício de condição
+
+# Executar o bot
+run_bot()
