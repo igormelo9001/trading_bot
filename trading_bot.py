@@ -1,6 +1,7 @@
 import ccxt
 import config
 import time
+import pandas as pd
 
 # Configurar a corretora (usando a Binance Testnet)
 exchange = ccxt.binance({
@@ -34,13 +35,40 @@ def trading_strategy(ticker_data):
         return 'short'
     return None
 
-def print_trade_details(order):
-    print(f"Ordem: {order['id']}")
+def print_trade_details(order, balance):
+    print(f"\nOrdem Executada:")
+    print(f"ID: {order['id']}")
     print(f"Tipo: {order['side']}")
     print(f"Preço: {order['price']}")
     print(f"Quantidade: {order['amount']}")
     print(f"Margem: {order['cost']}")
-    print(f"Saldo: {exchange.fetch_balance()}")
+    print(f"Saldo: {balance}")
+
+def display_ticker_info(ticker):
+    ticker_data = {
+        'Symbol': ticker['symbol'],
+        'Timestamp': ticker['timestamp'],
+        'Datetime': ticker['datetime'],
+        'High': ticker['high'],
+        'Low': ticker['low'],
+        'Bid': ticker['bid'],
+        'Bid Volume': ticker['bidVolume'],
+        'Ask': ticker['ask'],
+        'Ask Volume': ticker['askVolume'],
+        'VWAP': ticker['vwap'],
+        'Open': ticker['open'],
+        'Close': ticker['close'],
+        'Last': ticker['last'],
+        'Previous Close': ticker['previousClose'],
+        'Change': ticker['change'],
+        'Percentage': ticker['percentage'],
+        'Average': ticker['average'],
+        'Base Volume': ticker['baseVolume'],
+        'Quote Volume': ticker['quoteVolume']
+    }
+    df = pd.DataFrame([ticker_data])
+    print("\nTicker Data:")
+    print(df)
 
 # Monitorar o mercado e executar ordens
 def run_bot():
@@ -48,8 +76,8 @@ def run_bot():
     while True:
         try:
             ticker = exchange.fetch_ticker('BTC/USDT')  # Ajuste para o par de moedas desejado
-            print(f"Ticker: {ticker}")
-
+            display_ticker_info(ticker)
+            
             position = trading_strategy(ticker)
             print(f"Nova posição: {position}")
 
@@ -60,7 +88,9 @@ def run_bot():
                 elif position == 'short':
                     order = exchange.create_market_sell_order('BTC/USDT', 0.001)  # Ajuste a quantidade
                     print("Ordem de VENDA executada")
-                print_trade_details(order)
+                
+                balance = exchange.fetch_balance()
+                print_trade_details(order, balance)
                 previous_position = position
             else:
                 print("Nenhuma alteração na posição")
