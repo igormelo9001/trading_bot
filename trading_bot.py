@@ -1,67 +1,59 @@
 import ccxt
 import time
-from config import api_key, api_secret  # Importa as credenciais do arquivo config.py
-
-# Configurações da API da Binance
-symbol = 'BTC/USDT'
-
-# Configuração da exchange (Binance Testnet)
-exchange = ccxt.binance({
-    'apiKey': api_key,
-    'secret': api_secret,
-    'enableRateLimit': True,  # Habilita limitação de taxa (rate limit)
-    'options': {
-        'defaultType': 'future',  # Configura para operar no modo future
-    }
-})
+import config  # Arquivo onde você armazena suas chaves API de testnet
 
 def run_bot():
-    # Entrar no mercado comprando no preço de mercado
-    print("Entrando no mercado...")
-    order = exchange.create_market_buy_order(symbol, amount=0.001)
-    print("Ordem de compra executada:", order)
+    # Configuração do cliente da Binance Futures no testnet
+    exchange = ccxt.binance({
+        'apiKey': config.api_key,
+        'secret': config.api_secret,
+        'enableRateLimit': True,  # Habilita limitador de taxa
+        'options': {
+            'defaultType': 'future',
+            'adjustForTimeDifference': True,
+            'urls': {
+                'api': 'https://testnet.binancefuture.com',
+                'ws': 'wss://stream.binancefuture.com/ws',
+            }
+        }
+    })
 
-    # Loop principal para monitorar e decidir operações
+    # Teste de conexão
+    print('Conectando à Binance Futures Testnet...')
+    exchange.load_markets()
+
+    symbol = 'BTC/USDT'
+    timeframe = '1m'
+
     while True:
         try:
-            # Obter dados do ticker
+            # Obtém o ticker mais recente
             ticker = exchange.fetch_ticker(symbol)
-            print("\nTicker Data:")
-            print(ticker)
+            print(f"Ticker Data:\n{ticker}")
 
-            # Simulação de lógica para decidir entre long ou short
-            if should_enter_long(ticker):
-                print("\nIdentificado um bom momento para Long.")
-                # Criar operação de Long
-                order = exchange.create_market_buy_order(symbol, amount=0.001)
-                print("Ordem de compra (Long) executada:", order)
-            elif should_enter_short(ticker):
-                print("\nIdentificado um bom momento para Short.")
-                # Criar operação de Short
+            # Lógica para decisão de operação contrária
+            current_price = ticker['close']
+            previous_price = ticker['open']
+
+            if current_price > previous_price:
+                # Se o preço atual for maior que o preço anterior, vende
+                print(f"Preço atual ({current_price}) é maior que o preço anterior ({previous_price}). Venda iniciada.")
                 order = exchange.create_market_sell_order(symbol, amount=0.001)
-                print("Ordem de venda (Short) executada:", order)
+                print('Ordem de venda executada:', order)
+            elif current_price < previous_price:
+                # Se o preço atual for menor que o preço anterior, compra
+                print(f"Preço atual ({current_price}) é menor que o preço anterior ({previous_price}). Compra iniciada.")
+                order = exchange.create_market_buy_order(symbol, amount=0.001)
+                print('Ordem de compra executada:', order)
+            else:
+                print("Preço atual é igual ao preço anterior. Nenhuma operação realizada.")
 
-            # Exibir saldo em tempo real
-            balance = exchange.fetch_balance()
-            print("\nSaldo em tempo real:")
-            print(balance['total'])
-
-            # Esperar antes de verificar novamente (por exemplo, a cada 5 segundos)
-            time.sleep(5)
+            # Aguarda 1 minuto antes de verificar novamente
+            time.sleep(60)
 
         except Exception as e:
-            print(f"Erro encontrado: {e}")
-            time.sleep(10)  # Esperar antes de tentar novamente
+            print(f"Erro ao executar operação: {e}")
+            time.sleep(10)  # Aguarda 10 segundos antes de tentar novamente
 
-def should_enter_long(ticker):
-    # Lógica para determinar se deve entrar em Long
-    # Exemplo simplificado: baseado em uma condição fictícia
-    return ticker['change'] > 0.5  # Exemplo fictício de condição
-
-def should_enter_short(ticker):
-    # Lógica para determinar se deve entrar em Short
-    # Exemplo simplificado: baseado em uma condição fictícia
-    return ticker['change'] < -0.5  # Exemplo fictício de condição
-
-# Executar o bot
-run_bot()
+if __name__ == '__main__':
+    run_bot()
